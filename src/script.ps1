@@ -1,8 +1,15 @@
 $playlistUrl = "https://www.youtube.com/playlist?list=WL"
 $cookiesBrowser = "vivaldi"
-$downloadFolder = "$PSScriptRoot"
-$archiveFile = "$downloadFolder/archive.txt"
-$videoFile = "$downloadFolder/%(title)s [%(id)s].%(ext)s"
+$scriptFolder = "$PSScriptRoot"
+$downloadFolder= "$scriptFolder\downloads"
+$archiveFile = "$scriptFolder\archive.txt"
+$logFile = "$scriptFolder\log.txt"
+$videoFile = "$downloadFolder\%(title)s [%(id)s].%(ext)s"
+
+if(!(test-path -PathType container $downloadFolder))
+{
+    New-Item -ItemType Directory -Path $downloadFolder
+}
 
 Write-Host "Retrieving playlist information..."
 $playlistInfo = yt-dlp --flat-playlist --print-json --cookies-from-browser $cookiesBrowser $playlistUrl | ConvertFrom-Json
@@ -24,9 +31,21 @@ foreach ($file in $localFiles) {
     $id = $matches[$matches.Count - 1].Groups[1].Value
 
     if ($playlistVideos -notcontains $id) {
+        if (Test-Path $archiveFile) {
+            $archiveContent = Get-Content $archiveFile
+            $searchVideoId="youtube $id"
+            if ($archiveContent -contains $searchVideoId) {
+                Write-Host "Removing ID $id from archive.txt"
+                $updatedContent = $archiveContent | Where-Object { $_ -ne $searchVideoId }
+                $updatedContent | Set-Content -Path $archiveFile
+            }
+        }
+
         Write-Host "Deleting...: $($file.FullName)"
         Remove-Item -LiteralPath $file.FullName -Force
     }
+
+    # Remove the ID from archive.txt
 }
 
 Write-Host "Downloading new videos..."

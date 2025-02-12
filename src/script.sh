@@ -8,45 +8,72 @@ archiveFile="$scriptFolder/archive.txt"
 logFile="$scriptFolder/log.txt"
 videoFile="$downloadFolder/%(title)s [%(id)s].%(ext)s"
 
+log() {
+    local level="$1"
+    local message="$2"
+    local debug_enabled="false"
+    
+    if [[ "$level" == "DBG" && "$debug_enabled" != "true" ]]; then
+        return
+    fi
+
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp][$level] $message"
+    echo "[$timestamp][$level] $message" >> "$logFile"
+}
+
 if [[ "`pidof -x $(basename $0) -o %PPID`" ]]; then
-  echo "$(date +"%Y-%m-%d %H:%M:%S"): the script is running" >> "$logFile"; exit;
+  log "WRN" "the script is currently running";
+  exit;
 fi
 
 if [ ! -d "$downloadFolder" ]; then
-    echo "$(date +"%Y-%m-%d %H:%M:%S"): creating downloads folder at $downloadFolder"
+    log "INF" "creating downloads folder at $downloadFolder"
     mkdir -p "$downloadFolder"
 fi
 
-echo "$(date +"%Y-%m-%d %H:%M:%S"): retrieving playlist information..." >> "$logFile"
-playlistInfo=$(yt-dlp --flat-playlist --print-json --cookies-from-browser "$cookiesBrowser" "$playlistUrl")
+log "INF" "retrieving playlist information..."
+
+playlistInfo=$(yt-dlp --flat-playlist --print-json "$playlistUrl")
+log "DBG" "playlistInfo: $playlistInfo"
 playlistVideos=($(echo "$playlistInfo" | jq -r '.id'))
 
-echo "$(date +"%Y-%m-%d %H:%M:%S"): checking local files..." >> "$logFile"
+log "INF" "${#playlistVideos[@]} videos found."
+
+if [ "${#playlistVideos[@]}" -eq 0 ]; then
+    log "ERR" "No videos found in the playlist or failed to retrieve playlist information.";
+    exit;
+fi
+
+log "INF" "checking local files..."
+shopt -s dotglob  # includes hidden files 
 for file in "$downloadFolder"/*; do
+    log "DBG" "$file" 
     if [[ -f "$file" ]]; then
         baseName=$(basename "$file")
-        if [[ "$baseName" =~ \[([^\]]+)\] ]]; then
+        log "DBG" "$baseName" 
+        if [[ "$baseName" =~ \[([^\]]{11})\] ]]; then
             id="${BASH_REMATCH[1]}"
+            log "DBG" "$id"
             if [[ ! " ${playlistVideos[@]} " =~ " $id " ]]; then
                 if [[ -f "$archiveFile" ]]; then
                     searchVideoId="youtube $id"
                     archiveContent=$(<"$archiveFile")
                     if grep -q "$searchVideoId" <<< "$archiveContent"; then
-                        echo "$(date +"%Y-%m-%d %H:%M:%S"): removing id $id from archive file..." >> "$logFile"
+                        log "INF" "removing id $id from archive file..."
                         grep -v "$searchVideoId" "$archiveFile" > "$archiveFile.tmp" && mv "$archiveFile.tmp" "$archiveFile"
                     fi
                 fi
-                echo "$(date +"%Y-%m-%d %H:%M:%S"): deleting file $file" >> "$logFile"
+                log "INF" "deleting file $file"
                 rm -f "$file"
             fi
         else
-            echo "$(date +"%Y-%m-%d %H:%M:%S"): skipped: $baseName"
+            log "INF" "skipped: $baseName"
         fi
     fi
 done
+shopt -u dotglob  # exclude hidden files
 
-echo "$(date +"%Y-%m-%d %H:%M:%S"): downloading new videos..." >> "$logFile"
-
-yt-dlp --force-write-archive --download-archive "$archiveFile" "$playlistUrl" --cookies-from-browser "$cookiesBrowser" -o "$videoFile"
-
-echo "Done."
+log "INF" "downloading new videos..."
+yt-dlp --force-write-archive --download-archive "$archiveFile" "$playlistUrl" -o "$videoFile"
+log "INF" "done."

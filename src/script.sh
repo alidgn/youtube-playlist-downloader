@@ -64,7 +64,7 @@ for file in "$downloadFolder"/*; do
                         grep -v "$searchVideoId" "$archiveFile" > "$archiveFile.tmp" && mv "$archiveFile.tmp" "$archiveFile"
                     fi
                 fi
-                log "INF" "deleting file $file"
+                log "WRN" "deleting file $file"
                 rm -f "$file"
             fi
         else

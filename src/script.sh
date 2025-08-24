@@ -3,9 +3,9 @@
 playlistUrl="https://www.youtube.com/playlist?list=WL"
 cookiesBrowser="vivaldi"
 scriptFolder="$(pwd)"
-downloadFolder="$scriptFolder/downloads"
-archiveFile="$scriptFolder/archive.txt"
-logFile="$scriptFolder/log.txt"
+downloadFolder="$scriptFolder/data"
+archiveFile="$scriptFolder/index.txt"
+logFile="$scriptFolder/log.log"
 videoFile="$downloadFolder/%(title)s [%(id)s].%(ext)s"
 
 log() {
@@ -22,7 +22,7 @@ log() {
     echo "[$timestamp][$level] $message" >> "$logFile"
 }
 
-if [[ "`pidof -x $(basename $0) -o %PPID`" ]]; then
+if [[ "`pidof -x $0 -o %PPID`" ]]; then
   log "WRN" "the script is currently running";
   exit;
 fi
@@ -75,5 +75,5 @@ done
 shopt -u dotglob  # exclude hidden files
 
 log "INF" "downloading new videos..."
-yt-dlp --force-write-archive --download-archive "$archiveFile" "$playlistUrl" -o "$videoFile"
+yt-dlp --force-write-archive --download-archive "$archiveFile" --match-filter "live_status!=is_upcoming & live_status!=is_live & live_status!=was_live" "$playlistUrl" -o "$videoFile"
 log "INF" "done."
